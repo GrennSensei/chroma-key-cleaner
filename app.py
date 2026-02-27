@@ -134,7 +134,7 @@ def process_image(im: Image.Image, p: Params) -> Image.Image:
     if max(im.size) > p.max_side:
         im.thumbnail((p.max_side, p.max_side), Image.LANCZOS)
 
-    rgb_u8 = np.asarray(im, dtype=np.uint8)  # ~50MB @ 3600x4600
+    rgb_u8 = np.array(im, dtype=np.uint8, copy=True)  # ensure writable
 
     alpha_u8 = compute_alpha_u8(rgb_u8, p.green_tolerance)
     spill_suppress_edge_only(rgb_u8, alpha_u8, p.spill_strength)
@@ -160,6 +160,7 @@ async def process(
     hard_alpha: Optional[str] = Form(None),
 ):
     # IMPORTANT: do not read into bytes -> avoids duplicate memory buffer
+    file.file.seek(0)
     im = Image.open(file.file)
 
     p = Params(
