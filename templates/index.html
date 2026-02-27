@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chroma Key Cleaner (Gemini → Print-ready PNG)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; max-width: 980px; }
+    .card { border: 1px solid #e6e6e6; border-radius: 12px; padding: 16px; margin: 12px 0; }
+    label { display:block; margin-top: 10px; font-weight: 600; }
+    input[type="range"] { width: 100%; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .hint { color: #555; font-size: 13px; margin-top: 4px; }
+    .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #222; background: #111; color: #fff; cursor: pointer; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .small { font-size: 12px; color: #666; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Chroma Key Cleaner</h1>
+  <p class="small">
+    Feltöltöd a neon-zöld háttérrel generált képet, és kapsz egy tiszta, háttérmentes PNG-t.
+    A feldolgozás edge-only spill suppression-t használ, így a vékony vonalak nem tűnnek el.
+  </p>
+
+  <div class="card">
+    <form id="f" action="/process" method="post" enctype="multipart/form-data">
+      <label>Kép feltöltése (PNG/JPG)</label>
+      <input name="file" type="file" accept="image/png,image/jpeg" required />
+
+      <div class="row">
+        <div>
+          <label>Green tolerance (0–255): <span id="tolv">40</span></label>
+          <input id="tol" name="green_tolerance" type="range" min="0" max="255" value="40" />
+          <div class="hint">Minél magasabb, annál több “zöldes” pixel számít háttérnek (óvatosan a vékony vonalakkal).</div>
+        </div>
+        <div>
+          <label>Edge band (px): <span id="bandv">4</span></label>
+          <input id="band" name="edge_band_px" type="range" min="1" max="12" value="4" />
+          <div class="hint">Csak ebben a zónában fut a zöld “spill” színkorrekció.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Spill strength (0–100): <span id="spillv">65</span></label>
+          <input id="spill" name="spill_strength" type="range" min="0" max="100" value="65" />
+          <div class="hint">A zöld túlsúly visszahúzása az élek körül (alpha nem sérül).</div>
+        </div>
+        <div>
+          <label>Feather (0.0–2.0): <span id="featherv">0.6</span></label>
+          <input id="feather" name="feather" type="range" min="0" max="2" step="0.1" value="0.6" />
+          <div class="hint">Finom él-lágyítás (print-ready profilnál kicsi érték ajánlott).</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Alpha clamp low (0.0–0.2): <span id="clowv">0.03</span></label>
+          <input id="clow" name="alpha_clamp_low" type="range" min="0" max="0.2" step="0.01" value="0.03" />
+          <div class="hint">E alatt 0-ra vágjuk az alphát (zaj ellen).</div>
+        </div>
+        <div>
+          <label>Alpha clamp high (0.8–1.0): <span id="chighv">0.98</span></label>
+          <input id="chigh" name="alpha_clamp_high" type="range" min="0.8" max="1" step="0.01" value="0.98" />
+          <div class="hint">E felett 1-re vágjuk az alphát (print-ready élek).</div>
+        </div>
+      </div>
+
+      <label><input type="checkbox" name="hard_alpha" checked /> Hard alpha (print-ready)</label>
+      <div class="hint">Bekapcsolva a végeredmény “nyomdabarátabb” (kevesebb félátlátszó perem).</div>
+
+      <div style="margin-top: 14px;">
+        <button class="btn" type="submit">Process → PNG</button>
+      </div>
+      <p class="small mono">Tipp: ha vékony vonalak tűnnek el, vedd le a tolerance-t, és inkább a Spill strength-et emeld.</p>
+    </form>
+  </div>
+
+  <script>
+    const bind = (id, out) => {
+      const el = document.getElementById(id);
+      const o = document.getElementById(out);
+      const upd = () => o.textContent = el.value;
+      el.addEventListener('input', upd);
+      upd();
+    };
+    bind('tol', 'tolv');
+    bind('band', 'bandv');
+    bind('spill', 'spillv');
+    bind('feather', 'featherv');
+    bind('clow', 'clowv');
+    bind('chigh', 'chighv');
+  </script>
+</body>
+</html>
