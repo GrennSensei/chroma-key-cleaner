@@ -15,6 +15,7 @@
     .btn:disabled { opacity: 0.6; cursor: not-allowed; }
     .small { font-size: 12px; color: #666; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono"; font-size: 12px; }
+    .divider { margin-top: 14px; padding-top: 12px; border-top: 1px solid #eee; }
   </style>
 </head>
 <body>
@@ -36,46 +37,55 @@
           <div class="hint">Minél magasabb, annál több “zöldes” pixel számít háttérnek (óvatosan a vékony vonalakkal).</div>
         </div>
         <div>
-          <label>Edge band (px): <span id="bandv">4</span></label>
-          <input id="band" name="edge_band_px" type="range" min="1" max="12" value="4" />
-          <div class="hint">Csak ebben a zónában fut a zöld “spill” színkorrekció.</div>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
           <label>Spill strength (0–100): <span id="spillv">65</span></label>
           <input id="spill" name="spill_strength" type="range" min="0" max="100" value="65" />
           <div class="hint">A zöld túlsúly visszahúzása az élek körül (alpha nem sérül).</div>
         </div>
+      </div>
+
+      <div class="row">
         <div>
           <label>Feather (0.0–2.0): <span id="featherv">0.6</span></label>
           <input id="feather" name="feather" type="range" min="0" max="2" step="0.1" value="0.6" />
           <div class="hint">Finom él-lágyítás (print-ready profilnál kicsi érték ajánlott).</div>
         </div>
-      </div>
-
-      <div class="row">
         <div>
           <label>Alpha clamp low (0.0–0.2): <span id="clowv">0.03</span></label>
           <input id="clow" name="alpha_clamp_low" type="range" min="0" max="0.2" step="0.01" value="0.03" />
           <div class="hint">E alatt 0-ra vágjuk az alphát (zaj ellen).</div>
         </div>
+      </div>
+
+      <div class="row">
         <div>
           <label>Alpha clamp high (0.8–1.0): <span id="chighv">0.98</span></label>
           <input id="chigh" name="alpha_clamp_high" type="range" min="0.8" max="1" step="0.01" value="0.98" />
           <div class="hint">E felett 1-re vágjuk az alphát (print-ready élek).</div>
         </div>
+        <div>
+          <label>Hard alpha (print-ready)</label>
+          <label style="font-weight: 400; margin-top: 6px;">
+            <input type="checkbox" name="hard_alpha" checked />
+            Bekapcsolva “nyomdabarátabb” (kevesebb félátlátszó perem).
+          </label>
+        </div>
       </div>
 
-      <label><input type="checkbox" name="hard_alpha" checked /> Hard alpha (print-ready)</label>
-      <div class="hint">Bekapcsolva a végeredmény “nyomdabarátabb” (kevesebb félátlátszó perem).</div>
+      <div class="divider">
+        <label>Edge decontamination</label>
 
-      <label><input type="checkbox" name="decontaminate" checked /> Decontaminate edges (recommended)</label>
-<div class="hint">Edge zónában a zöld háttér “keveredését” számolja vissza, így eltűnik a green fringe.</div>
+        <label style="font-weight: 400; margin-top: 6px;">
+          <input type="checkbox" name="decontaminate" checked />
+          Decontaminate edges (recommended)
+        </label>
+        <div class="hint">Edge zónában a zöld háttér “keveredését” számolja vissza, így eltűnik a green fringe.</div>
 
-<label><input type="checkbox" name="ultra_clean" /> Ultra clean edges (1px inward matte)</label>
-<div class="hint">Print-ready trükk: 1 px befelé húzza az alphát, ha a legutolsó halo is zavar.</div>
+        <label style="font-weight: 400; margin-top: 10px;">
+          <input type="checkbox" name="ultra_clean" />
+          Ultra clean edges (1px inward matte)
+        </label>
+        <div class="hint">Print-ready trükk: 1 px befelé húzza az alphát, ha a legutolsó halo is zavar.</div>
+      </div>
 
       <div style="margin-top: 14px;">
         <button class="btn" type="submit">Process → PNG</button>
@@ -93,7 +103,6 @@
       upd();
     };
     bind('tol', 'tolv');
-    bind('band', 'bandv');
     bind('spill', 'spillv');
     bind('feather', 'featherv');
     bind('clow', 'clowv');
