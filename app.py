@@ -264,7 +264,7 @@ async def process(
         alpha_clamp_low=float(np.clip(alpha_clamp_low, 0.0, 0.2)),
         alpha_clamp_high=float(np.clip(alpha_clamp_high, 0.8, 1.0)),
         hard_alpha=(hard_alpha is not None),
-        decontaminate=(decontaminate is not None) if "decontaminate" in (await file.form()) else True,
+        decontaminate=(decontaminate is not None),
         ultra_clean=(ultra_clean is not None),
     )
 
