@@ -82,10 +82,36 @@ def edge_mask_from_alpha(alpha_u8: np.ndarray, expand_px: int) -> np.ndarray:
 def refine_alpha_u8(alpha_u8: np.ndarray, feather: float, clamp_low: float, clamp_high: float, hard_alpha: bool) -> np.ndarray:
     a = alpha_u8
 
+    # --- MEMORY SAFE feather ---
     if feather > 0:
-        img = Image.fromarray(a, mode="L").filter(ImageFilter.GaussianBlur(radius=float(feather)))
+        # Dynamic downscale factor based on feather radius:
+        # bigger feather -> more downscale -> cheaper blur
+        # (keeps visual quality for edge feathering)
+        if feather <= 0.6:
+            scale = 1
+        elif feather <= 1.2:
+            scale = 2
+        else:
+            scale = 4
+
+        img = Image.fromarray(a, mode="L")
+
+        if scale > 1:
+            w, h = img.size
+            w2 = max(1, w // scale)
+            h2 = max(1, h // scale)
+            # Downsample alpha matte
+            img_small = img.resize((w2, h2), resample=Image.BILINEAR)
+            # Blur at reduced resolution (radius also reduced)
+            img_small = img_small.filter(ImageFilter.GaussianBlur(radius=float(feather) / scale))
+            # Upsample back
+            img = img_small.resize((w, h), resample=Image.BILINEAR)
+        else:
+            img = img.filter(ImageFilter.GaussianBlur(radius=float(feather)))
+
         a = np.asarray(img, dtype=np.uint8)
 
+    # --- clamp ---
     low = int(np.clip(clamp_low, 0.0, 0.2) * 255.0 + 0.5)
     high = int(np.clip(clamp_high, 0.8, 1.0) * 255.0 + 0.5)
 
@@ -93,6 +119,7 @@ def refine_alpha_u8(alpha_u8: np.ndarray, feather: float, clamp_low: float, clam
     a[a < low] = 0
     a[a > high] = 255
 
+    # --- harden ---
     if hard_alpha:
         x = (a.astype(np.float32) / 255.0)
         y = x * x * (3.0 - 2.0 * x)  # smoothstep
