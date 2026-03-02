@@ -196,52 +196,55 @@ def decontaminate_edges_inplace(rgb_u8: np.ndarray, alpha_u8: np.ndarray, edge_m
     rgb_u8[..., 2][m] = (b_f + 0.5).astype(np.uint8)
 
 
-def clamp_green_spill_inplace(rgb_u8: np.ndarray, edge_mask: np.ndarray, strength: int):
+def halo_hunter_inplace(rgb_u8: np.ndarray, alpha_u8: np.ndarray, px: int = 1, margin: int = 6, strength: int = 90):
     """
-    Extra safety: after decontamination, clamp residual green dominance in edge zone.
-    MEMORY SAFE: compute ONLY on masked pixels (no full-frame float32 temps).
+    Removes last 1px neon-green halo that can remain even where alpha is already ~opaque.
+    Memory-safe: operates mostly in uint8/int16 and uses PIL only for a tiny dilation.
+    
+    - Only considers pixels with near-opaque alpha (>=240) to avoid touching true background.
+    - Only where green dominates (G > max(R,B)+margin).
+    - Dilates mask by px to catch corners/curves.
+    - Pulls G down strongly toward avg(R,B).
     """
     if strength <= 0:
         return
 
-    k = strength / 100.0
-    if k <= 0:
-        return
+    a = alpha_u8
+    opaque = a >= 240  # near-opaque edge interior
 
-    # Work in uint8 views (no big casts)
-    r_u8 = rgb_u8[..., 0]
-    g_u8 = rgb_u8[..., 1]
-    b_u8 = rgb_u8[..., 2]
-
-    # Compute green dominance mask using small int16 conversions ONLY where needed
-    # First, find candidate pixels from edge mask
-    ys, xs = np.nonzero(edge_mask)
-    if ys.size == 0:
-        return
-
-    # Pull only those pixels
-    r = r_u8[ys, xs].astype(np.int16, copy=False)
-    g = g_u8[ys, xs].astype(np.int16, copy=False)
-    b = b_u8[ys, xs].astype(np.int16, copy=False)
+    r = rgb_u8[..., 0].astype(np.int16, copy=False)
+    g = rgb_u8[..., 1].astype(np.int16, copy=False)
+    b = rgb_u8[..., 2].astype(np.int16, copy=False)
 
     maxrb = np.maximum(r, b)
-    green_dom = g > (maxrb + 1)  # tiny margin to avoid neutral pixels
+    green_dom = g > (maxrb + margin)
 
-    if not np.any(green_dom):
+    m = opaque & green_dom
+    if not np.any(m):
         return
 
-    # Keep only green-dominant subset
-    ys2 = ys[green_dom]
-    xs2 = xs[green_dom]
+    # Dilate mask to catch hard corners/curves
+    if px > 0:
+        img = Image.fromarray((m.astype(np.uint8) * 255), mode="L")
+        size = 2 * px + 1
+        img2 = img.filter(ImageFilter.MaxFilter(size=size))
+        m = (np.asarray(img2, dtype=np.uint8) > 0)
 
-    r2 = r_u8[ys2, xs2].astype(np.float32, copy=False)
-    g2 = g_u8[ys2, xs2].astype(np.float32, copy=False)
-    b2 = b_u8[ys2, xs2].astype(np.float32, copy=False)
+    if not np.any(m):
+        return
 
-    target = (r2 + b2) * 0.5  # avg(R,B)
+    # Mask-only update (RAM safe)
+    ys, xs = np.nonzero(m)
+    r2 = rgb_u8[..., 0][ys, xs].astype(np.float32, copy=False)
+    g2 = rgb_u8[..., 1][ys, xs].astype(np.float32, copy=False)
+    b2 = rgb_u8[..., 2][ys, xs].astype(np.float32, copy=False)
+
+    target = (r2 + b2) * 0.5
+    k = np.clip(strength / 100.0, 0.0, 1.0)
+
     g_new = (1.0 - k) * g2 + k * target
 
-    g_u8[ys2, xs2] = np.clip(g_new + 0.5, 0, 255).astype(np.uint8)
+    rgb_u8[..., 1][ys, xs] = np.clip(g_new + 0.5, 0, 255).astype(np.uint8)
 
 
 def process_image(im: Image.Image, p: Params) -> Image.Image:
