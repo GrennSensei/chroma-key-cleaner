@@ -195,6 +195,47 @@ def decontaminate_edges_inplace(rgb_u8: np.ndarray, alpha_u8: np.ndarray, edge_m
     rgb_u8[..., 1][m] = (g_f + 0.5).astype(np.uint8)
     rgb_u8[..., 2][m] = (b_f + 0.5).astype(np.uint8)
 
+def clamp_green_spill_inplace(rgb_u8: np.ndarray, edge_mask: np.ndarray, strength: int):
+    """
+    Extra safety: clamp residual green dominance in edge zone.
+    MEMORY SAFE: compute ONLY on masked pixels (no full-frame float32 temps).
+    """
+    if strength <= 0:
+        return
+
+    k = strength / 100.0
+    if k <= 0:
+        return
+
+    r_u8 = rgb_u8[..., 0]
+    g_u8 = rgb_u8[..., 1]
+    b_u8 = rgb_u8[..., 2]
+
+    ys, xs = np.nonzero(edge_mask)
+    if ys.size == 0:
+        return
+
+    r = r_u8[ys, xs].astype(np.int16, copy=False)
+    g = g_u8[ys, xs].astype(np.int16, copy=False)
+    b = b_u8[ys, xs].astype(np.int16, copy=False)
+
+    maxrb = np.maximum(r, b)
+    green_dom = g > (maxrb + 1)
+    if not np.any(green_dom):
+        return
+
+    ys2 = ys[green_dom]
+    xs2 = xs[green_dom]
+
+    r2 = r_u8[ys2, xs2].astype(np.float32, copy=False)
+    g2 = g_u8[ys2, xs2].astype(np.float32, copy=False)
+    b2 = b_u8[ys2, xs2].astype(np.float32, copy=False)
+
+    target = (r2 + b2) * 0.5
+    g_new = (1.0 - k) * g2 + k * target
+
+    g_u8[ys2, xs2] = np.clip(g_new + 0.5, 0, 255).astype(np.uint8)
+
 
 def halo_hunter_inplace(rgb_u8: np.ndarray, alpha_u8: np.ndarray, px: int = 1, margin: int = 6, strength: int = 90):
     """
