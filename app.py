@@ -172,34 +172,49 @@ def decontaminate_edges_inplace(rgb_u8: np.ndarray, alpha_u8: np.ndarray, edge_m
 def clamp_green_spill_inplace(rgb_u8: np.ndarray, edge_mask: np.ndarray, strength: int):
     """
     Extra safety: after decontamination, clamp residual green dominance in edge zone.
-    This is general (not red-specific).
+    MEMORY SAFE: compute ONLY on masked pixels (no full-frame float32 temps).
     """
     if strength <= 0:
         return
 
     k = strength / 100.0
-    m = edge_mask
-    if not np.any(m):
+    if k <= 0:
         return
 
-    r = rgb_u8[..., 0].astype(np.int16, copy=False)
-    g = rgb_u8[..., 1].astype(np.int16, copy=False)
-    b = rgb_u8[..., 2].astype(np.int16, copy=False)
+    # Work in uint8 views (no big casts)
+    r_u8 = rgb_u8[..., 0]
+    g_u8 = rgb_u8[..., 1]
+    b_u8 = rgb_u8[..., 2]
+
+    # Compute green dominance mask using small int16 conversions ONLY where needed
+    # First, find candidate pixels from edge mask
+    ys, xs = np.nonzero(edge_mask)
+    if ys.size == 0:
+        return
+
+    # Pull only those pixels
+    r = r_u8[ys, xs].astype(np.int16, copy=False)
+    g = g_u8[ys, xs].astype(np.int16, copy=False)
+    b = b_u8[ys, xs].astype(np.int16, copy=False)
 
     maxrb = np.maximum(r, b)
-    green_dom = g > (maxrb + 1)  # tiny margin
+    green_dom = g > (maxrb + 1)  # tiny margin to avoid neutral pixels
 
-    mm = m & green_dom
-    if not np.any(mm):
+    if not np.any(green_dom):
         return
 
-    target = ((r + b) // 2).astype(np.float32)
-    g_f = g.astype(np.float32)
+    # Keep only green-dominant subset
+    ys2 = ys[green_dom]
+    xs2 = xs[green_dom]
 
-    g_new = (1.0 - k) * g_f + k * target
-    g_new_u8 = np.clip(g_new + 0.5, 0, 255).astype(np.uint8)
+    r2 = r_u8[ys2, xs2].astype(np.float32, copy=False)
+    g2 = g_u8[ys2, xs2].astype(np.float32, copy=False)
+    b2 = b_u8[ys2, xs2].astype(np.float32, copy=False)
 
-    rgb_u8[..., 1][mm] = g_new_u8[mm]
+    target = (r2 + b2) * 0.5  # avg(R,B)
+    g_new = (1.0 - k) * g2 + k * target
+
+    g_u8[ys2, xs2] = np.clip(g_new + 0.5, 0, 255).astype(np.uint8)
 
 
 def process_image(im: Image.Image, p: Params) -> Image.Image:
